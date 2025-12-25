@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Classroom Spinner Wheel</title>
+    <style>
+        /* ============================================
+           ROOT DESIGN SYSTEM
+           ============================================ */
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.5);
+            --danger: #ef4444;
+            --success: #22c55e;
+            --font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        /* ============================================
+           BASE STYLES
+           ============================================ */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* ============================================
+           HEADER
+           ============================================ */
+        .header {
+            background: var(--bg-card);
+            border-bottom: 1px solid #334155;
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+
+        .logo-area { display: flex; align-items: center; gap: 10px; }
+        .logo-icon { font-size: 24px; animation: spin-slow 10s linear infinite; }
+        .logo-text { font-size: 1.25rem; font-weight: 800; letter-spacing: 1px; color: var(--accent); }
+
+        .controls-top { display: flex; gap: 15px; align-items: center; }
+
+        select {
+            background: #0f172a;
+            border: 1px solid #475569;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            outline: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        select:focus { border-color: var(--accent); }
+
+        .icon-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .icon-btn:hover { background: var(--accent); transform: scale(1.1); }
+
+        /* ============================================
+           MAIN LAYOUT
+           ============================================ */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+        }
+
+        /* ============================================
+           SPINNER AREA
+           ============================================ */
+        .spinner-container {
+            position: relative;
+            width: min(85vmin, 550px);
+            height: min(85vmin, 550px);
+            margin-bottom: 30px;
+        }
+
+        /* The Triangle Pointer */
+        .pointer {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 40px;
+            z-index: 20;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+        }
+        
+        .pointer::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 40px solid #ef4444;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            border-radius: 50%;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5), 0 0 15px var(--accent-glow);
+            transition: transform 0.1s;
+        }
+
+        /* ============================================
+           WINNER DISPLAY
+           ============================================ */
+        .winner-card {
+            background: rgba(30, 41, 59, 0.9);
+            backdrop-filter: blur(10px);
+            padding: 20px 40px;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+            margin-bottom: 20px;
+            transform: scale(0.9);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: absolute;
+            z-index: 50;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            pointer-events: none; /* Let clicks pass through when hidden */
+        }
+
+        .winner-card.active {
+            transform: scale(1);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .winner-label {
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            color: var(--accent);
+            margin-bottom: 5px;
+        }
+
+        .winner-name {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* ============================================
+           ACTION BUTTONS
+           ============================================ */
+        .actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        .btn {
+            padding: 14px 32px;
+            border-radius: 12px;
+            border: none;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        .btn-spin {
+            background: linear-gradient(135deg, var(--accent), #2563eb);
+            color: white;
+            min-width: 160px;
+        }
+
+        .btn-spin:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .btn-spin:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+
+        .btn-reset { background: #334155; color: white; }
+        .btn-reset:hover { background: #475569; }
+
+        .btn-remove { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.5); }
+        .btn-remove:hover:not(:disabled) { background: #ef4444; color: white; }
+        .btn-remove:disabled { opacity: 0.3; cursor: default; }
+
+        /* Custom Text Area Modal */
+        #customInputArea {
+            display: none;
+            width: 100%;
+            max-width: 500px;
+            margin-top: 10px;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            background: #0f172a;
+            border: 1px solid var(--accent);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        /* Stats Footer */
+        .footer-stats {
+            margin-top: auto;
+            width: 100%;
+            background: #0f172a;
+            padding: 10px 20px;
+            border-top: 1px solid #1e293b;
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        
+        .stat span { color: var(--accent); font-weight: bold; margin-left: 5px; }
+
+        /* Confetti Canvas */
+        #confettiCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        @keyframes spin-slow { 100% { transform: rotate(360deg); } }
+        
+        /* Mobile Adjustments */
+        @media (max-width: 600px) {
+            .header { flex-direction: column; gap: 10px; align-items: stretch; }
+            .controls-top { justify-content: space-between; }
+            .spinner-container { width: 90vmin; height: 90vmin; }
+            .winner-name { font-size: 1.8rem; }
+            .btn { padding: 12px 24px; font-size: 0.9rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="logo-area">
+            <div class="logo-icon">🎡</div>
+            <div class="logo-text">CLASS SPINNER</div>
+        </div>
+        <div class="controls-top">
+            <select id="classSelect">
+                <option value="" disabled selected>Select List...</option>
+                <option value="custom">✏️ Custom Input (Paste Names)</option>
+                <option value="class3">Class 3</option>
+                <option value="class4">Class 4</option>
+                <option value="class5">Class 5</option>
+                <option value="class6">Class 6</option>
+                <option value="class7">Class 7</option>
+                <option value="class8">Class 8</option>
+                <option value="class9">Class 9</option>
+                <option value="class10">Class 10</option>
+            </select>
+            <button class="icon-btn" id="soundBtn" title="Toggle Sound">🔊</button>
+            <button class="icon-btn" id="fsBtn" title="Fullscreen">⛶</button>
+        </div>
+    </div>
+
+    <div style="display: flex; justify-content: center; padding: 0 20px;">
+        <div id="customInputArea">
+            <textarea id="customNames" placeholder="Paste names here, separated by commas or new lines..."></textarea>
+            <button class="btn btn-spin" id="loadCustomBtn" style="width:100%; min-width:unset;">Load Names</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="winner-card" id="winnerCard">
+            <div class="winner-label">Selected Student</div>
+            <div class="winner-name" id="winnerText">Are you ready?</div>
+        </div>
+
+        <div class="spinner-container">
+            <div class="pointer"></div>
+            <canvas id="wheelCanvas"></canvas>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-spin" id="spinBtn" disabled>SPIN WHEEL</button>
+            <button class="btn btn-remove" id="removeBtn" disabled>Remove Winner</button>
+            <button class="btn btn-reset" id="resetBtn" disabled>Reset</button>
+        </div>
+    </div>
+
+    <div class="footer-stats">
+        <div class="stat">Total: <span id="statTotal">0</span></div>
+        <div class="stat">Remaining: <span id="statRemaining">0</span></div>
+    </div>
+
+    <canvas id="confettiCanvas"></canvas>
+
+    <script>
+        // ============================================
+        // DATA & STATE
+        // ============================================
+        const defaultData = {
+            class3: ['Aarav', 'Ishaan', 'Rohan', 'Vikram', 'Arjun', 'Nikhil', 'Karan', 'Pranav', 'Siddharth', 'Aditya'],
+            class4: ['Ananya', 'Diya', 'Priya', 'Neha', 'Kajal', 'Pooja', 'Ritu', 'Sneha', 'Tanvi', 'Veda'],
+            class5: ['Aryan', 'Bhavesh', 'Chirag', 'Darshan', 'Eklavya', 'Faisal', 'Gaurav', 'Hemanth', 'Ishwar', 'Jaideep'],
+            class6: ['Maya', 'Nisha', 'Olivia', 'Prerna', 'Quincy', 'Riya', 'Shriya', 'Tanvi', 'Uma', 'Vibha'],
+            class7: ['Aman', 'Bhuvan', 'Chetan', 'Deepak', 'Eshan', 'Farhan', 'Govind', 'Harsh', 'Ishan', 'Jahnvi'],
+            class8: ['Avni', 'Bhumi', 'Chhavi', 'Dhara', 'Esha', 'Fiona', 'Gaurvi', 'Hira', 'Isha', 'Jiya'],
+            class9: ['Aakash', 'Brijesh', 'Chand', 'Devendra', 'Eraj', 'Farhan', 'Gagan', 'Harjinder', 'Ishaan', 'Jatin'],
+            class10: ['Abha', 'Brinda', 'Chandrika', 'Deepika', 'Elanor', 'Fatima', 'Girija', 'Harshita', 'Indira', 'Jasmeen']
+        };
+
+        let students = []; // Current active list
+        let originalList = []; // For reset
+        let currentRotation = 0;
+        let isSpinning = false;
+        let soundEnabled = true;
+        let animationId = null;
+
+        // Canvas Setup
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Colors
+        const colors = ['#f43f5e', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
+        // Elements
+        const classSelect = document.getElementById('classSelect');
+        const customInputArea = document.getElementById('customInputArea');
+        const customNamesTxt = document.getElementById('customNames');
+        const loadCustomBtn = document.getElementById('loadCustomBtn');
+        const spinBtn = document.getElementById('spinBtn');
+        const removeBtn = document.getElementById('removeBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const winnerCard = document.getElementById('winnerCard');
+        const winnerText = document.getElementById('winnerText');
+
+        // ============================================
+        // AUDIO SYSTEM (Synthesized sounds)
+        // ============================================
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = new AudioContext();
+
+        function playTick() {
+            if (!soundEnabled) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.frequency.value = 800; // High click
+            osc.type = 'triangle';
+            
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+            
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 0.05);
+        }
+
+        function playWinSound() {
+            if (!soundEnabled) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            // Simple ascending arpeggio
+            const notes = [523.25, 659.25, 783.99, 1046.50];
+            notes.forEach((freq, i) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                
+                const time = audioCtx.currentTime + (i * 0.1);
+                gain.gain.setValueAtTime(0, time);
+                gain.gain.linearRampToValueAtTime(0.1, time + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
+                
+                osc.start(time);
+                osc.stop(time + 0.4);
+            });
+        }
+
+        // ============================================
+        // INITIALIZATION & RESIZING
+        // ============================================
+        function resizeCanvas() {
+            const size = Math.min(window.innerWidth * 0.85, 550);
+            const dpr = window.devicePixelRatio || 1;
+            
+            // Set display size (css pixels)
+            canvas.style.width = size + "px";
+            canvas.style.height = size + "px";
+            
+            // Set actual size in memory (scaled to account for extra pixel density)
+            canvas.width = size * dpr;
+            canvas.height = size * dpr;
+            
+            // Normalize coordinate system to use css pixels
+            ctx.scale(dpr, dpr);
+            
+            drawWheel();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // ============================================
+        // LOGIC
+        // ============================================
+        function loadClass(className) {
+            if (className === 'custom') {
+                customInputArea.style.display = 'block';
+                return;
+            } else {
+                customInputArea.style.display = 'none';
+            }
+
+            if (defaultData[className]) {
+                originalList = [...defaultData[className]];
+                students = [...originalList];
+                resetState();
+            }
+        }
+
+        function loadCustomNames() {
+            const input = customNamesTxt.value;
+            // Split by comma or new line, filter empty
+            const names = input.split(/[\n,]+/).map(n => n.trim()).filter(n => n.length > 0);
+            
+            if (names.length < 2) {
+                alert("Please enter at least 2 names.");
+                return;
+            }
+            
+            originalList = [...names];
+            students = [...names];
+            customInputArea.style.display = 'none';
+            resetState();
+        }
+
+        function resetState() {
+            currentRotation = 0;
+            winnerCard.classList.remove('active');
+            updateUI();
+            drawWheel();
+        }
+
+        function updateUI() {
+            spinBtn.disabled = students.length < 1 || isSpinning;
+            removeBtn.disabled = true; // Only enabled after spin
+            resetBtn.disabled = students.length === 0;
+            
+            document.getElementById('statTotal').textContent = originalList.length;
+            document.getElementById('statRemaining').textContent = students.length;
+        }
+
+        // ============================================
+        // DRAWING THE WHEEL
+        // ============================================
+        function drawWheel() {
+            // Use CSS width/height for calculations because we scaled the context
+            const width = parseFloat(canvas.style.width);
+            const height = parseFloat(canvas.style.height);
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const radius = width / 2 - 5; // Padding
+
+            ctx.clearRect(0, 0, width, height);
+
+            if (students.length === 0) return;
+
+            const sliceAngle = (2 * Math.PI) / students.length;
+
+            students.forEach((student, i) => {
+                const startAngle = currentRotation + (i * sliceAngle);
+                const endAngle = currentRotation + ((i + 1) * sliceAngle);
+
+                // Slice
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.fill();
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Text
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(startAngle + sliceAngle / 2);
+                ctx.textAlign = "right";
+                ctx.fillStyle = "#fff";
+                ctx.font = "bold 16px Arial";
+                ctx.shadowColor = "rgba(0,0,0,0.5)";
+                ctx.shadowBlur = 4;
+                // Draw text slightly inward from edge
+                ctx.fillText(student.length > 15 ? student.substring(0,12)+"..." : student, radius - 20, 5);
+                ctx.restore();
+            });
+
+            // Center Knob
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 25, 0, 2 * Math.PI);
+            ctx.fillStyle = '#f1f5f9';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 10, 0, 2 * Math.PI);
+            ctx.fillStyle = '#334155';
+            ctx.fill();
+        }
+
+        // ============================================
+        // SPINNING LOGIC
+        // ============================================
+        function spin() {
+            if (isSpinning) return;
+            isSpinning = true;
+            winnerCard.classList.remove('active');
+            spinBtn.disabled = true;
+            removeBtn.disabled = true;
+            resetBtn.disabled = true;
+
+            // Random spin duration and force
+            const spinDuration = 4000; // ms
+            const spinRevolutions = 5 + Math.random() * 5; // 5 to 10 full spins
+            const finalAngle = Math.random() * 2 * Math.PI; // Random end position
+            
+            const startRotation = currentRotation;
+            const totalRotation = (spinRevolutions * 2 * Math.PI) + finalAngle;
+            
+            const startTime = performance.now();
+            let lastTickSlice = -1;
+
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / spinDuration, 1);
+                
+                // Easing function (Ease Out Cubic)
+                const ease = 1 - Math.pow(1 - progress, 3);
+                
+                currentRotation = startRotation + (totalRotation * ease);
+                
+                drawWheel();
+
+                // Sound Logic: Detect when a slice line passes the pointer (270deg / -PI/2)
+                // Normalize rotation to find which slice is at the top
+                const sliceAngle = (2 * Math.PI) / students.length;
+                // Offset by PI/2 because pointer is at top (270deg), not 0deg (3 o'clock)
+                const normalizedRot = (currentRotation + Math.PI/2) % (2 * Math.PI);
+                const currentSliceIndex = Math.floor((2 * Math.PI - normalizedRot) / sliceAngle) % students.length;
+
+                if (currentSliceIndex !== lastTickSlice && progress < 0.95) {
+                    playTick();
+                    lastTickSlice = currentSliceIndex;
+                }
+
+                if (progress < 1) {
+                    animationId = requestAnimationFrame(animate);
+                } else {
+                    isSpinning = false;
+                    finishSpin();
+                }
+            }
+            
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function finishSpin() {
+            // Determine winner
+            // Logic: The pointer is at 270 degrees (3*PI/2) or -90 degrees.
+            // Our 0 degrees is 3 o'clock.
+            const sliceAngle = (2 * Math.PI) / students.length;
+            // Normalize currentRotation to 0-2PI
+            const normalizedRotation = currentRotation % (2 * Math.PI);
+            
+            // Calculate which index is under the pointer
+            // Pointer is stationary at 270deg. The wheel rotated `normalizedRotation`.
+            // We need to find `i` such that `normalizedRotation + i*sliceAngle` contains 270deg.
+            // Math: index = ( (270deg - rotation) / sliceAngle ) % total
+            
+            let angleAtPointer = (3 * Math.PI / 2) - normalizedRotation;
+            // Normalize result to positive 0-2PI
+            while (angleAtPointer < 0) angleAtPointer += 2 * Math.PI;
+            
+            const winningIndex = Math.floor(angleAtPointer / sliceAngle) % students.length;
+            const winner = students[winningIndex];
+
+            // Show Winner
+            winnerText.textContent = winner;
+            winnerCard.classList.add('active');
+            
+            playWinSound();
+            fireConfetti();
+            
+            spinBtn.disabled = false;
+            removeBtn.disabled = false; // Enable remove button now
+            removeBtn.onclick = () => removeStudent(winner);
+            resetBtn.disabled = false;
+        }
+
+        function removeStudent(name) {
+            students = students.filter(s => s !== name);
+            winnerCard.classList.remove('active');
+            updateUI();
+            
+            // Slightly rotate to indicate change
+            currentRotation += 0.1;
+            drawWheel();
+            
+            if (students.length === 0) {
+                winnerText.textContent = "All Done!";
+                winnerCard.classList.add('active');
+            }
+        }
+
+        // ============================================
+        // CONFETTI EFFECT (Simple Particle System)
+        // ============================================
+        const confettiCanvas = document.getElementById('confettiCanvas');
+        const cCtx = confettiCanvas.getContext('2d');
+        let particles = [];
+
+        function resizeConfetti() {
+            confettiCanvas.width = window.innerWidth;
+            confettiCanvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeConfetti);
+        resizeConfetti();
+
+        function fireConfetti() {
+            particles = [];
+            const count = 150;
+            for(let i=0; i<count; i++) {
+                particles.push({
+                    x: window.innerWidth / 2,
+                    y: window.innerHeight / 2,
+                    vx: (Math.random() - 0.5) * 15,
+                    vy: (Math.random() - 0.5) * 15 - 5, // Upward bias
+                    life: 100 + Math.random() * 50,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    size: Math.random() * 8 + 4
+                });
+            }
+            updateConfetti();
+        }
+
+        function updateConfetti() {
+            cCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+            
+            particles.forEach((p, index) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.2; // Gravity
+                p.life--;
+                
+                cCtx.fillStyle = p.color;
+                cCtx.fillRect(p.x, p.y, p.size, p.size);
+            });
+
+            particles = particles.filter(p => p.life > 0);
+
+            if(particles.length > 0) {
+                requestAnimationFrame(updateConfetti);
+            }
+        }
+
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+        spinBtn.addEventListener('click', spin);
+        
+        resetBtn.addEventListener('click', () => {
+            students = [...originalList];
+            resetState();
+        });
+
+        classSelect.addEventListener('change', (e) => loadClass(e.target.value));
+        loadCustomBtn.addEventListener('click', loadCustomNames);
+
+        document.getElementById('soundBtn').addEventListener('click', (e) => {
+            soundEnabled = !soundEnabled;
+            e.target.textContent = soundEnabled ? '🔊' : '🔇';
+            e.target.style.opacity = soundEnabled ? '1' : '0.5';
+        });
+
+        document.getElementById('fsBtn').addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        });
+
+        // Initialize First Render
+        resizeCanvas();
+
+    </script>
+</body>
+</html>
