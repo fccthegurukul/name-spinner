@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Core: Ultimate</title>
+    <style>
+        :root {
+            --bg: #050505;
+            --glass: rgba(20, 20, 20, 0.7);
+            --primary: #00f3ff; /* Cyan */
+            --secondary: #ff00ff; /* Pink */
+            --success: #00ff00;
+            --danger: #ff0055;
+            --text: #fff;
+        }
+        body { margin: 0; overflow: hidden; background: var(--bg); font-family: 'Segoe UI', sans-serif; user-select: none; }
+        
+        /* === BACKGROUND & HEADER === */
+        .header {
+            position: absolute; top: 10px; width: 100%; text-align: center; pointer-events: none; z-index: 5;
+        }
+        .header h1 {
+            margin: 0; color: rgba(255,255,255,0.08); font-size: 3rem; text-transform: uppercase; letter-spacing: 15px; font-weight: 900;
+        }
+
+        /* === FLOATING LEADERBOARD (Always Visible) === */
+        .leaderboard-panel {
+            position: absolute; top: 80px; left: 20px; width: 260px; bottom: 20px;
+            background: var(--glass); border: 1px solid rgba(255,255,255,0.1);
+            border-left: 4px solid var(--secondary);
+            backdrop-filter: blur(10px); border-radius: 12px;
+            display: flex; flex-direction: column; z-index: 10;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+            transition: transform 0.3s;
+        }
+        .lb-header {
+            padding: 15px; background: rgba(255,255,255,0.05); font-weight: bold; color: var(--secondary);
+            border-bottom: 1px solid rgba(255,255,255,0.1); letter-spacing: 1px; display: flex; justify-content: space-between;
+        }
+        .lb-content {
+            flex: 1; overflow-y: auto; padding: 10px;
+        }
+        .lb-row {
+            display: flex; justify-content: space-between; padding: 8px 10px;
+            margin-bottom: 5px; background: rgba(0,0,0,0.3); border-radius: 4px;
+            font-size: 0.9rem; color: #ddd; transition: 0.2s;
+        }
+        .lb-row.top-rank { border: 1px solid var(--primary); background: rgba(0, 243, 255, 0.1); }
+        .lb-score { font-weight: bold; color: var(--success); }
+        
+        /* Hide Scrollbar */
+        .lb-content::-webkit-scrollbar { width: 5px; }
+        .lb-content::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+        /* === SETTINGS MENU TOGGLE === */
+        .settings-btn {
+            position: absolute; top: 20px; right: 20px; z-index: 50;
+            background: rgba(255,255,255,0.1); color: white; border: 1px solid #444;
+            padding: 10px 15px; cursor: pointer; border-radius: 8px; font-weight: bold;
+            transition: 0.3s;
+        }
+        .settings-btn:hover { background: var(--primary); color: black; box-shadow: 0 0 15px var(--primary); }
+
+        /* === SETTINGS MODAL (Hidden by default) === */
+        .settings-modal {
+            position: fixed; top: 0; right: -350px; width: 320px; height: 100vh;
+            background: #111; border-left: 1px solid #333; z-index: 60;
+            padding: 25px; transition: right 0.3s ease; box-shadow: -10px 0 50px rgba(0,0,0,0.8);
+            display: flex; flex-direction: column; gap: 20px;
+        }
+        .settings-modal.active { right: 0; }
+        
+        textarea, select {
+            width: 100%; background: #000; border: 1px solid #333; color: var(--primary);
+            padding: 10px; border-radius: 5px; font-family: monospace; resize: vertical;
+        }
+        .btn-action { width: 100%; padding: 10px; background: #333; color: white; border: none; cursor: pointer; border-radius: 5px; font-weight: bold; }
+        .btn-action:hover { background: #555; }
+        
+        .close-settings { position: absolute; top: 10px; right: 15px; cursor: pointer; color: #666; font-size: 1.5rem; }
+
+        /* === SPIN BUTTON (Bottom Right) === */
+        .spin-container {
+            position: absolute; bottom: 40px; right: 40px; z-index: 20;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .spin-btn {
+            width: 100px; height: 100px; border-radius: 50%;
+            background: rgba(0,0,0,0.5); border: 4px solid var(--primary);
+            color: white; font-weight: 900; font-size: 1.2rem; cursor: pointer;
+            box-shadow: 0 0 30px var(--primary), inset 0 0 20px var(--primary);
+            text-shadow: 0 0 10px var(--primary); transition: all 0.2s;
+            display: flex; justify-content: center; align-items: center;
+            text-transform: uppercase; letter-spacing: 2px;
+        }
+        .spin-btn:hover { transform: scale(1.1); background: var(--primary); color: black; box-shadow: 0 0 60px var(--primary); }
+        .spin-btn:active { transform: scale(0.95); }
+        .spin-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; box-shadow: none; border-color: #555; }
+        .key-hint { margin-top: 10px; font-size: 0.8rem; color: #666; font-weight: bold; }
+
+        /* === MAIN CANVAS === */
+        #gameCanvas { position: absolute; top:0; left:0; width:100%; height:100%; }
+
+        /* === WINNER MODAL === */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 100; display: none;
+            justify-content: center; align-items: center; backdrop-filter: blur(10px);
+        }
+        .modal-card {
+            background: #0a0a0a; border: 2px solid var(--secondary); padding: 40px; border-radius: 20px;
+            text-align: center; box-shadow: 0 0 100px rgba(255, 0, 255, 0.2);
+            animation: zoomIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            max-width: 500px; width: 90%;
+        }
+        @keyframes zoomIn { from{transform:scale(0.8);opacity:0;} to{transform:scale(1);opacity:1;} }
+
+        .winner-name { font-size: 4rem; font-weight: 900; color: white; margin-bottom: 20px; line-height: 1; text-shadow: 0 0 30px white; }
+        
+        .quiz-box { border: 1px dashed #333; padding: 20px; border-radius: 10px; background: #080808; margin-bottom: 20px; }
+        .quiz-word { font-size: 3rem; color: #ffe600; font-weight: bold; letter-spacing: 1px; }
+
+        .modal-btns { display: flex; gap: 15px; justify-content: center; }
+        .m-btn { 
+            padding: 15px 30px; font-size: 1.1rem; border-radius: 8px; border: none; cursor: pointer; 
+            font-weight: bold; flex: 1; transition: transform 0.2s; color: black;
+        }
+        .m-yes { background: var(--success); box-shadow: 0 0 20px var(--success); }
+        .m-no { background: var(--danger); box-shadow: 0 0 20px var(--danger); color: white; }
+        .m-btn:hover { transform: translateY(-3px); filter: brightness(1.2); }
+        
+        .shortcut { display: block; font-size: 0.7rem; opacity: 0.6; margin-top: 5px; font-weight: normal; }
+
+    </style>
+</head>
+<body>
+
+    <div class="header"><h1>NEON CORE</h1></div>
+
+    <button class="settings-btn" onclick="toggleSettings()">⚙️ SETUP</button>
+
+    <div class="settings-modal" id="settingsPanel">
+        <span class="close-settings" onclick="toggleSettings()">&times;</span>
+        <h2 style="color:white; margin:0;">Game Setup</h2>
+        
+        <div>
+            <label style="color:#888; font-size:0.8rem;">Student List</label>
+            <textarea id="studentList" rows="8">Aarav, Vihaan, Vivaan, Ananya, Diya, Ishaan, Reyansh, Hazel, Amaira, Dhruv, Kabir, Saanvi, Arjun, Myra, Riya, Krishna</textarea>
+        </div>
+        
+        <div>
+            <label style="color:#888; font-size:0.8rem;">Word Level</label>
+            <select id="levelSelect">
+                <option value="1">Level 1 (Easy)</option>
+                <option value="2">Level 2 (Medium)</option>
+                <option value="3">Level 3 (Hard)</option>
+            </select>
+        </div>
+
+        <button class="btn-action" style="background:var(--primary); color:black;" onclick="initGame()">🔄 Apply Changes</button>
+        <button class="btn-action" style="background:#333; margin-top:auto;" onclick="resetScores()">🗑️ Reset All Scores</button>
+    </div>
+
+    <div class="leaderboard-panel">
+        <div class="lb-header">
+            <span>🏆 TOP SCORES</span>
+            <span id="totalHits" style="color:#fff">0 Hits</span>
+        </div>
+        <div class="lb-content" id="leaderboard">
+            </div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="spin-container">
+        <button class="spin-btn" id="spinBtn" onclick="spin()">SPIN</button>
+        <div class="key-hint">[ SPACE ]</div>
+    </div>
+
+    <div class="modal-overlay" id="modal">
+        <div class="modal-card">
+            <div style="color:var(--secondary); letter-spacing:2px; font-size:0.8rem; margin-bottom:10px;">POINTER SELECTED</div>
+            <div class="winner-name" id="modalName">Name</div>
+            
+            <div class="quiz-box">
+                <div style="color:#666; font-size:0.75rem; margin-bottom:5px;">WORD CHALLENGE</div>
+                <div class="quiz-word" id="modalWord">WORD</div>
+            </div>
+
+            <div class="modal-btns">
+                <button class="m-btn m-yes" onclick="submitResult(1)">
+                    CORRECT
+                    <span class="shortcut">[ Press A ]</span>
+                </button>
+                <button class="m-btn m-no" onclick="submitResult(-0.5)">
+                    WRONG
+                    <span class="shortcut">[ Press F ]</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================= CONFIG & DATA =================
+        const wordDB = {
+            1: ["Happy", "Sad", "Run", "Jump", "Play", "Eat", "Sun", "Moon", "Sky", "Red", "Blue", "Cat", "Dog", "Fish"],
+            2: ["Bright", "Smart", "Friend", "School", "Garden", "Market", "Planet", "Ocean", "Forest", "Castle", "Doctor"],
+            3: ["Adventure", "Mystery", "Victory", "Universe", "Dangerous", "Exciting", "Curious", "Journey", "Knowledge"]
+        };
+
+        const colors = ['#00f3ff', '#ff00ff', '#00ff00', '#ffff00', '#ff0055'];
+
+        // ================= ENGINE SETUP =================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        let width, height, cx, cy;
+        let students = [];
+        let spinner = { angle: 0, velocity: 0, friction: 0.985 };
+        let isSpinning = false;
+        let particles = [];
+        let stars = [];
+        let currentTarget = null;
+        let totalHits = 0;
+        let soundCooldown = 0;
+
+        // Resize
+        window.addEventListener('resize', resize);
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            cx = width / 2;
+            cy = height / 2; // Perfectly center for game
+            if(!isSpinning) initGame();
+            initStars();
+        }
+
+        // ================= INITIALIZATION =================
+        function initGame() {
+            const raw = document.getElementById('studentList').value;
+            const names = raw.split(',').map(s => s.trim()).filter(s => s);
+            
+            let savedScores = {};
+            students.forEach(s => savedScores[s.name] = s.score);
+
+            students = [];
+            // Calculate radius based on screen size but keep room for UI
+            const radius = Math.min(width, height) * 0.35; 
+            const step = (Math.PI * 2) / names.length;
+
+            names.forEach((name, i) => {
+                students.push({
+                    name: name,
+                    angle: step * i,
+                    x: 0, y: 0,
+                    score: savedScores[name] || 0,
+                    color: colors[i % colors.length],
+                    radius: radius
+                });
+            });
+            
+            updatePositions();
+            updateLeaderboard();
+            toggleSettings(false); // Close menu if open
+        }
+
+        function initStars() {
+            stars = [];
+            for(let i=0; i<100; i++) stars.push({
+                x: Math.random()*width, y: Math.random()*height, 
+                size: Math.random()*2, alpha: Math.random()
+            });
+        }
+
+        function updatePositions() {
+            students.forEach(s => {
+                s.x = cx + Math.cos(s.angle) * s.radius;
+                s.y = cy + Math.sin(s.angle) * s.radius;
+            });
+        }
+
+        // ================= GAME LOOP =================
+        function loop() {
+            // Background Clear
+            ctx.fillStyle = "#050505";
+            ctx.fillRect(0, 0, width, height);
+
+            drawStars();
+            drawTrack();
+            drawStudents();
+            
+            if (isSpinning) updatePhysics();
+            
+            drawPointer();
+            updateParticles();
+
+            requestAnimationFrame(loop);
+        }
+
+        // ================= DRAWING =================
+        function drawStars() {
+            ctx.fillStyle = "white";
+            stars.forEach(s => {
+                ctx.globalAlpha = s.alpha * 0.3;
+                ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI*2); ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        function drawTrack() {
+            // Center Glow
+            const grad = ctx.createRadialGradient(cx, cy, 10, cx, cy, 300);
+            grad.addColorStop(0, "rgba(0, 243, 255, 0.05)");
+            grad.addColorStop(1, "transparent");
+            ctx.fillStyle = grad;
+            ctx.beginPath(); ctx.arc(cx, cy, 300, 0, Math.PI*2); ctx.fill();
+
+            // Track Ring
+            ctx.strokeStyle = "rgba(255,255,255,0.05)";
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.arc(cx, cy, students[0].radius, 0, Math.PI*2); ctx.stroke();
+            
+            // Center Core
+            ctx.shadowBlur = 20; ctx.shadowColor = "rgba(0, 243, 255, 0.4)";
+            ctx.fillStyle = "#080808"; ctx.strokeStyle = "#00f3ff"; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(cx, cy, 40, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        function drawStudents() {
+            let pointedIndex = getPointedStudentIndex();
+            
+            students.forEach((s, i) => {
+                const isSelected = (i === pointedIndex);
+                ctx.save();
+                ctx.translate(s.x, s.y);
+                
+                // Card dimensions
+                const w = 120; const h = 36;
+                
+                if (isSelected) {
+                    ctx.scale(1.15, 1.15);
+                    ctx.shadowBlur = 20; ctx.shadowColor = s.color;
+                }
+
+                ctx.fillStyle = "#0a0a0a";
+                ctx.strokeStyle = isSelected ? "#fff" : s.color;
+                ctx.lineWidth = isSelected ? 3 : 1;
+                
+                ctx.beginPath(); ctx.roundRect(-w/2, -h/2, w, h, 6);
+                ctx.fill(); ctx.stroke();
+
+                ctx.fillStyle = isSelected ? "#fff" : "#bbb";
+                ctx.font = isSelected ? "bold 15px sans-serif" : "13px sans-serif";
+                ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                ctx.fillText(s.name, 0, 0);
+
+                ctx.restore();
+            });
+        }
+
+        function drawPointer() {
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(spinner.angle);
+
+            // GLOWING POINTER
+            ctx.shadowBlur = 25; ctx.shadowColor = "#ff00ff";
+            
+            // Base
+            ctx.fillStyle = "#333";
+            ctx.beginPath(); ctx.moveTo(-12, -8); ctx.lineTo(-12, 8); ctx.lineTo(0, 0); ctx.fill();
+
+            // Beam
+            ctx.fillStyle = "#ff00ff";
+            ctx.beginPath();
+            ctx.moveTo(0, -3); 
+            ctx.lineTo(students[0].radius - 65, -1);
+            ctx.lineTo(students[0].radius - 65, 1);
+            ctx.lineTo(0, 3);
+            ctx.fill();
+
+            // Tip
+            ctx.fillStyle = "#fff";
+            ctx.beginPath();
+            ctx.moveTo(students[0].radius - 70, -8);
+            ctx.lineTo(students[0].radius - 45, 0);
+            ctx.lineTo(students[0].radius - 70, 8);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // ================= PHYSICS =================
+        function spin() {
+            if (isSpinning || students.length === 0) return;
+            isSpinning = true;
+            document.getElementById('spinBtn').disabled = true;
+            spinner.velocity = 0.4 + Math.random() * 0.2; // Power
+            playSound('rev'); // Engine Start Sound
+        }
+
+        function updatePhysics() {
+            spinner.angle += spinner.velocity;
+            spinner.velocity *= spinner.friction;
+
+            // DYNAMIC SOUND LOGIC
+            // Play a tick sound based on speed (simulating gears/turbine)
+            soundCooldown--;
+            if (soundCooldown <= 0 && spinner.velocity > 0.002) {
+                // Higher pitch when faster
+                const pitch = 200 + (spinner.velocity * 2000); 
+                playSound('tick', pitch);
+                // Faster ticks when faster
+                soundCooldown = Math.max(3, Math.floor(1 / (spinner.velocity * 30)));
+            }
+
+            if (spinner.velocity < 0.0005) {
+                spinner.velocity = 0;
+                isSpinning = false;
+                finishSpin();
+            }
+        }
+
+        function getPointedStudentIndex() {
+            let pAngle = spinner.angle % (Math.PI * 2);
+            if (pAngle < 0) pAngle += Math.PI * 2;
+            
+            let bestIndex = -1; let minDiff = 100;
+
+            students.forEach((s, i) => {
+                let diff = Math.abs(pAngle - s.angle);
+                if (diff > Math.PI) diff = (Math.PI * 2) - diff;
+                if (diff < minDiff) { minDiff = diff; bestIndex = i; }
+            });
+            return bestIndex;
+        }
+
+        function finishSpin() {
+            const winnerIdx = getPointedStudentIndex();
+            const winner = students[winnerIdx];
+            currentTarget = winner;
+
+            playSound('win');
+            createParticles(winner.x, winner.y, winner.color);
+            
+            setTimeout(() => openModal(winner), 800);
+        }
+
+        // ================= PARTICLES =================
+        function createParticles(x, y, color) {
+            for(let i=0; i<30; i++) particles.push({
+                x:x, y:y, vx:(Math.random()-0.5)*10, vy:(Math.random()-0.5)*10, life:1, color:color
+            });
+        }
+        function updateParticles() {
+            for(let i=particles.length-1; i>=0; i--) {
+                let p = particles[i];
+                p.x += p.vx; p.y += p.vy; p.life -= 0.03;
+                ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
+                ctx.globalAlpha = 1;
+                if(p.life <= 0) particles.splice(i,1);
+            }
+        }
+
+        // ================= AUDIO ENGINE (IMPROVED) =================
+        function playSound(type, freqParam=0) {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            const t = audioCtx.currentTime;
+
+            if (type === 'rev') {
+                // Engine Rev Up
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(50, t);
+                osc.frequency.exponentialRampToValueAtTime(800, t+0.5);
+                gain.gain.setValueAtTime(0.4, t);
+                gain.gain.linearRampToValueAtTime(0, t+1.0);
+                osc.start(); osc.stop(t+1.0);
+            }
+            else if (type === 'tick') {
+                // Mechanical Click
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(freqParam, t);
+                gain.gain.setValueAtTime(0.1, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t+0.05);
+                osc.start(); osc.stop(t+0.05);
+            }
+            else if (type === 'win') {
+                // Victory Chime
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, t);
+                osc.frequency.linearRampToValueAtTime(1000, t+0.3);
+                gain.gain.setValueAtTime(0.4, t);
+                gain.gain.linearRampToValueAtTime(0, t+1.0);
+                osc.start(); osc.stop(t+1.0);
+            }
+            else if (type === 'correct') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(600, t);
+                osc.frequency.linearRampToValueAtTime(1200, t+0.2);
+                gain.gain.setValueAtTime(0.3, t); gain.gain.linearRampToValueAtTime(0, t+0.4);
+                osc.start(); osc.stop(t+0.4);
+            }
+            else if (type === 'wrong') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, t);
+                osc.frequency.linearRampToValueAtTime(80, t+0.3);
+                gain.gain.setValueAtTime(0.3, t); gain.gain.linearRampToValueAtTime(0, t+0.4);
+                osc.start(); osc.stop(t+0.4);
+            }
+        }
+
+        // ================= UI & LOGIC =================
+        function toggleSettings(forceState) {
+            const panel = document.getElementById('settingsPanel');
+            if (typeof forceState !== 'undefined') {
+                if(forceState) panel.classList.add('active'); else panel.classList.remove('active');
+            } else {
+                panel.classList.toggle('active');
+            }
+        }
+
+        function openModal(student) {
+            const modal = document.getElementById('modal');
+            const lvl = document.getElementById('levelSelect').value;
+            const words = wordDB[lvl];
+            const word = words[Math.floor(Math.random() * words.length)];
+            
+            document.getElementById('modalName').innerText = student.name;
+            document.getElementById('modalWord').innerText = word;
+            modal.style.display = 'flex';
+        }
+
+        function submitResult(val) {
+            if(!currentTarget) return;
+            currentTarget.score += val;
+            totalHits++;
+            document.getElementById('totalHits').innerText = totalHits + " Hits";
+            
+            if(val > 0) playSound('correct'); else playSound('wrong');
+
+            document.getElementById('modal').style.display = 'none';
+            document.getElementById('spinBtn').disabled = false;
+            updateLeaderboard();
+            currentTarget = null;
+        }
+
+        function updateLeaderboard() {
+            const box = document.getElementById('leaderboard');
+            box.innerHTML = '';
+            let sorted = [...students].sort((a,b) => b.score - a.score);
+            sorted.forEach((s, i) => {
+                const rankClass = i === 0 ? 'top-rank' : '';
+                box.innerHTML += `
+                    <div class="lb-row ${rankClass}">
+                        <span>${i+1}. ${s.name}</span>
+                        <span class="lb-score" style="color:${s.score>=0?'#0f0':'#f00'}">${s.score}</span>
+                    </div>
+                `;
+            });
+        }
+
+        function resetScores() {
+            students.forEach(s => s.score = 0);
+            totalHits = 0;
+            document.getElementById('totalHits').innerText = "0 Hits";
+            updateLeaderboard();
+        }
+
+        // ================= KEYBOARD INPUTS =================
+        document.addEventListener('keydown', (e) => {
+            const modalOpen = document.getElementById('modal').style.display === 'flex';
+            
+            // SPACE to Spin
+            if (e.code === 'Space' && !isSpinning && !modalOpen) {
+                spin();
+            }
+            // A for Correct
+            if (e.code === 'KeyA' && modalOpen) {
+                submitResult(1);
+            }
+            // F for Wrong
+            if (e.code === 'KeyF' && modalOpen) {
+                submitResult(-0.5);
+            }
+        });
+
+        // INIT
+        resize();
+        initGame();
+        loop();
+
+    </script>
+</body>
+</html>
